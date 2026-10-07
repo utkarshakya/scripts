@@ -55,7 +55,7 @@ Both scripts read the base folder from `config.json` in this folder. The file cu
 }
 ```
 
-If you want to use a different directory, edit `config.json` and replace the value with your own local path. If the file is missing or the path does not exist, the scripts fall back to the default `OneDrive\Desktop\Public` location.
+If you want to use a different directory, edit `config.json` and replace the value with your own local path. If `config.json` is missing or `base_path` is empty, the scripts use the default `OneDrive\Desktop\Public` location. If the configured path does not exist or the config file is invalid, the script reports an error instead of silently using another folder. The bulk updater's optional `--path` argument takes precedence over the config value.
 
 ## Notes
 

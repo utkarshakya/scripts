@@ -1,91 +1,148 @@
-import os
+import argparse
+import json
 import subprocess
 import sys
-import json
-import argparse
 from pathlib import Path
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 
 class MinimalGitPuller:
     """Automated git pull with fetch-first optimization and animated UI."""
 
-    def __init__(self, base_path):
+    def __init__(self, base_path: Union[str, Path]) -> None:
         self.base_path = Path(base_path)
-        self.found_repos = []
-        self.results = {
-            'updated': [],      # Repos that received changes
-            'up_to_date': [],   # Repos already current
-            'failed': [],       # Repos with errors
-            'skipped': []       # Repos without remotes or no updates needed
+        self.found_repos: List[Path] = []
+        self.results: Dict[str, List[Any]] = {
+            "updated": [],
+            "up_to_date": [],
+            "failed": [],
+            "skipped": [],
         }
 
-    # ... (rest of methods unchanged, but I must provide them as per instructions)
-
-    def is_git_repo(self, path):
-        git_dir = path / '.git'
+    @staticmethod
+    def is_git_repo(path: Path) -> bool:
+        git_dir = path / ".git"
         return git_dir.exists() and git_dir.is_dir()
 
-    def find_git_repos(self, path, depth=0, max_depth=10):
-        if depth > max_depth: return
+    def find_git_repos(self, path: Path, depth: int = 0, max_depth: int = 10) -> None:
+        if depth > max_depth:
+            return
+
         try:
-            for item in path.iterdir():
-                if item.name.startswith('.'): continue
+            children = sorted(path.iterdir())
+        except OSError as error:
+            print(f"⚠️  Could not scan {path}: {error}")
+            return
+
+        for item in children:
+            if item.name.startswith("."):
+                continue
+            try:
                 if item.is_dir():
                     if self.is_git_repo(item):
                         self.found_repos.append(item)
                     else:
                         self.find_git_repos(item, depth + 1, max_depth)
-        except Exception: pass
+            except OSError as error:
+                print(f"⚠️  Could not inspect {item}: {error}")
 
-    def has_remote(self, repo_path):
+    def has_remote(self, repo_path: Path) -> Tuple[Optional[bool], str]:
         try:
-            result = subprocess.run(['git', '-C', str(repo_path), 'remote', '-v'], capture_output=True, text=True, timeout=5)
-            return bool(result.stdout.strip())
-        except Exception: return False
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "remote", "-v"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                return None, result.stderr.strip() or "Could not inspect repository remotes"
+            return bool(result.stdout.strip()), ""
+        except (OSError, subprocess.SubprocessError) as error:
+            return None, str(error)
 
-    def fetch_repo(self, repo_path):
+    def fetch_repo(self, repo_path: Path) -> Tuple[bool, str]:
         try:
-            result = subprocess.run(['git', '-C', str(repo_path), 'fetch'], capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "fetch"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
             return result.returncode == 0, result.stderr.strip()
-        except Exception as e: return False, str(e)
+        except (OSError, subprocess.SubprocessError) as error:
+            return False, str(error)
 
-    def check_behind(self, repo_path):
+    def check_behind(self, repo_path: Path) -> Tuple[Optional[bool], int, str]:
         try:
-            result = subprocess.run(['git', '-C', str(repo_path), 'rev-list', 'HEAD..@{u}', '--count'], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "rev-list", "HEAD..@{u}", "--count"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
             if result.returncode == 0:
-                return int(result.stdout.strip()) > 0, int(result.stdout.strip())
-            return False, 0
-        except Exception: return False, 0
+                commit_count = int(result.stdout.strip())
+                return commit_count > 0, commit_count, ""
+            return None, 0, result.stderr.strip() or "Could not determine upstream status"
+        except (OSError, subprocess.SubprocessError, ValueError) as error:
+            return None, 0, str(error)
 
-    def pull_repo(self, repo_path):
+    def pull_repo(self, repo_path: Path) -> Tuple[bool, str]:
         try:
-            result = subprocess.run(['git', '-C', str(repo_path), 'pull'], capture_output=True, text=True, timeout=30)
-            return result.returncode == 0, result.stdout.strip()
-        except Exception as e: return False, str(e)
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "pull"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            message = result.stdout.strip() or result.stderr.strip()
+            return result.returncode == 0, message
+        except (OSError, subprocess.SubprocessError) as error:
+            return False, str(error)
 
-    def process_repo(self, repo_path):
+    def process_repo(self, repo_path: Path) -> None:
         relative_path = repo_path.relative_to(self.base_path)
-        if not self.has_remote(repo_path):
-            self.results['skipped'].append({'path': relative_path, 'reason': 'No remote'})
+        has_remote, error = self.has_remote(repo_path)
+        if has_remote is None:
+            self.results["failed"].append(
+                {"path": relative_path, "error": f"Remote check failed: {error}"}
+            )
+            return
+        if not has_remote:
+            self.results["skipped"].append(
+                {"path": relative_path, "reason": "No remote"}
+            )
             return
 
         success, error = self.fetch_repo(repo_path)
         if not success:
-            self.results['failed'].append({'path': relative_path, 'error': f"Fetch failed: {error}"})
+            self.results["failed"].append(
+                {"path": relative_path, "error": f"Fetch failed: {error}"}
+            )
             return
 
-        is_behind, commit_count = self.check_behind(repo_path)
+        is_behind, commit_count, error = self.check_behind(repo_path)
+        if is_behind is None:
+            self.results["failed"].append(
+                {"path": relative_path, "error": f"Upstream check failed: {error}"}
+            )
+            return
         if not is_behind:
-            self.results['up_to_date'].append(relative_path)
+            self.results["up_to_date"].append(relative_path)
             return
 
         success, message = self.pull_repo(repo_path)
         if success:
-            self.results['updated'].append({'path': relative_path, 'commits': commit_count})
+            self.results["updated"].append(
+                {"path": relative_path, "commits": commit_count}
+            )
         else:
-            self.results['failed'].append({'path': relative_path, 'error': f"Pull failed: {message}"})
+            self.results["failed"].append(
+                {"path": relative_path, "error": f"Pull failed: {message}"}
+            )
 
-    def run(self):
+    def run(self) -> None:
         start_time = datetime.now()
         print("=" * 60)
         print("  AUTO GIT PULL".center(60))
@@ -99,40 +156,70 @@ class MinimalGitPuller:
             self.process_repo(repo)
 
         print("\n" + "=" * 60)
-        if self.results['updated']:
+        if self.results["updated"]:
             print(f"✅ UPDATED ({len(self.results['updated'])}):")
-            for item in self.results['updated']: print(f"   • {item['path']} (+{item['commits']} commits)")
+            for item in self.results["updated"]:
+                print(f"   • {item['path']} (+{item['commits']} commits)")
 
-        if self.results['failed']:
+        if self.results["failed"]:
             print(f"❌ FAILED ({len(self.results['failed'])}):")
-            for item in self.results['failed']: print(f"   • {item['path']}: {item['error']}")
+            for item in self.results["failed"]:
+                print(f"   • {item['path']}: {item['error']}")
 
-        print(f"⏩ UP TO DATE: {len(self.results['up_to_date'])} | ⚠️ SKIPPED: {len(self.results['skipped'])}")
+        print(
+            f"⏩ UP TO DATE: {len(self.results['up_to_date'])} | "
+            f"⚠️ SKIPPED: {len(self.results['skipped'])}"
+        )
         print(f"⏱️  Duration: {(datetime.now() - start_time).total_seconds():.1f}s")
         print("=" * 60)
 
-def load_config():
+
+def load_config() -> Optional[str]:
     config_path = Path(__file__).parent / 'config.json'
-    if config_path.exists():
-        with open(config_path, 'r') as f:
-            return json.load(f).get('base_path')
-    return None
+    if not config_path.exists():
+        return None
+
+    try:
+        with config_path.open("r", encoding="utf-8") as config_file:
+            config = json.load(config_file)
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"Could not read {config_path}: {error}") from error
+
+    if not isinstance(config, dict):
+        raise ValueError(f"{config_path} must contain a JSON object")
+
+    base_path = config.get("base_path")
+    if base_path is not None and not isinstance(base_path, str):
+        raise ValueError(f"'base_path' in {config_path} must be a string")
+    return base_path or None
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Auto-pull updates for all Git repos in a directory.")
-    parser.add_argument('--path', type=str, help="Directory to scan for Git repos")
+    parser = argparse.ArgumentParser(
+        description="Auto-pull updates for all Git repos in a directory."
+    )
+    parser.add_argument("--path", type=str, help="Directory to scan for Git repos")
     args = parser.parse_args()
 
-    # Priority: 1. CLI Arg, 2. config.json, 3. Default (OneDrive)
-    base_path = args.path or load_config() or str(Path.home() / 'OneDrive' / 'Desktop' / 'Public')
+    configured_path = None
+    if not args.path:
+        try:
+            configured_path = load_config()
+        except ValueError as error:
+            print(f"❌ Configuration error: {error}")
+            sys.exit(1)
 
-    if not os.path.exists(base_path):
-        print(f"❌ Error: Path not found: {base_path}")
+    base_path = Path(
+        args.path or configured_path or Path.home() / "OneDrive" / "Desktop" / "Public"
+    )
+    if not base_path.is_dir():
+        print(f"❌ Error: Base folder not found or is not a directory: {base_path}")
         sys.exit(1)
 
     puller = MinimalGitPuller(base_path)
     puller.run()
     input("\nPress Enter to exit...")
+
 
 if __name__ == "__main__":
     main()
