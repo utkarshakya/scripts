@@ -1,27 +1,31 @@
-# MyScripts 🛠️
+# Utility Scripts
 
-A collection of personal utility scripts for development, automation, and system management.
+A collection of reusable utility scripts for development, automation, and local system tasks. Each tool is self-contained and includes its own README with the specific setup, configuration, and usage details.
 
-## 📂 Contents
+## Included Tools
 
-| Tool | Description |
-| :--- | :--- |
-| **[Auto Pull from GitHub](auto_pull_from_github/)** | Automatically fetch and pull updates for all Git repositories in a folder. |
-| **[Data Toolbox](data_toolbox/)** | Utilities for converting CSV to JSON and paginating large JSON files. |
-| **[Run ADB Headless](run_adb_headless/)** | Connect to Android devices via Wireless Debugging (Android 11+) without USB. |
-| **[Universal Script Runner](universal_script_runner/)** | Run any script (Python, Node, Bash) on multiple files in a directory. |
+- [Auto Pull from GitHub](./auto-pull-from-github)  
+  Automated Git repository syncing and repo status checks.
 
-## 🚀 Setup & Usage
+- [Data Toolbox](./data-toolbox)  
+  Utilities for working with CSV and JSON data.
 
-Each tool has its own `README.md` with detailed usage instructions. Navigate to the specific folder to learn more.
+- [Run ADB Headless](./run-adb-headless)  
+  Android device management and wireless debugging helper.
 
-### Prerequisites
-*   Python 3.8+
-*   Git
-*   (Optional) Node.js for some scripts
+- [Universal Script Runner](./universal-script-runner)  
+  Batch execution utility for running scripts across many files.
 
-## 🔒 Project Specific Scripts
-Some scripts are project-specific (e.g., `android_build.py`, `schooldriver_logs.py`) and are kept in the `project_specific/` directory. This directory is **ignored** by Git to keep the repository clean and portable.
+## Documentation
 
-## 🤝 Contributing
-Feel free to open issues or submit PRs if you have ideas for new scripts or improvements!
+For detailed instructions, configuration notes, and usage examples, refer to the README in each tool folder:
+
+- [Auto Pull from GitHub README](./auto-pull-from-github/README.md)
+- [Data Toolbox README](./data-toolbox/README.md)
+- [Run ADB Headless README](./run-adb-headless/README.md)
+- [Universal Script Runner README](./universal-script-runner/README.md)
+
+## Notes
+
+- This repo is intentionally focused on general-purpose scripts and utilities.
+- Each tool may have different prerequisites or configuration requirements, so the tool-level README is the source of truth.

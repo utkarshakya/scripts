@@ -1,7 +1,26 @@
 import os
 import subprocess
 import sys
+import json
 from pathlib import Path
+
+
+def load_base_path():
+    """Load the configured repo base path from config.json if available."""
+    config_path = Path(__file__).parent / 'config.json'
+    if not config_path.exists():
+        return None
+
+    try:
+        with open(config_path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            configured_path = data.get('base_path')
+            if configured_path:
+                return str(configured_path)
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        pass
+
+    return None
 
 
 class GitRepoManager:
@@ -220,22 +239,19 @@ class GitRepoManager:
 
 def main():
     """Entry point for the interactive script."""
-    # Get the Public folder on Desktop
-    desktop = Path.home() / 'OneDrive' / 'Desktop'
-    public_folder = desktop / 'Public'
-    
-    # Check if Public folder exists
-    if not public_folder.exists():
-        print(f"❌ Error: Public folder not found at {public_folder}")
-        print("   Please create the folder or update the path in the script.")
+    configured_base_path = load_base_path()
+    base_path = Path(configured_base_path) if configured_base_path else Path.home() / 'OneDrive' / 'Desktop' / 'Public'
+
+    if not base_path.exists():
+        print(f"❌ Error: Base folder not found at {base_path}")
+        print("   Update the path in config.json or create the folder and try again.")
         sys.exit(1)
-    
-    if not public_folder.is_dir():
-        print(f"❌ Error: {public_folder} is not a directory")
+
+    if not base_path.is_dir():
+        print(f"❌ Error: {base_path} is not a directory")
         sys.exit(1)
-    
-    # Run the manager
-    manager = GitRepoManager(public_folder)
+
+    manager = GitRepoManager(base_path)
     manager.run()
 
 

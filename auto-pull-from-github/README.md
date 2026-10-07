@@ -1,70 +1,79 @@
-# PullFromGithub
+# Auto Pull from GitHub
 
-## Purpose
+Utilities for keeping local Git repositories in sync with their remotes from a shared base folder.
 
-PullFromGithub is a small pair of utilities to make pulling updates across multiple local Git repositories easier on Windows. The repository provides:
+## Included Scripts
 
-- `auto_git_pull.py` — scans a base folder for Git repositories, fetches remotes and pulls only those that are behind.
-- `interactive_git_manager.py` — a terminal-based interactive manager to browse folders, inspect repo status, and pull or open repositories individually.
+- `auto_git_pull.py` — scans a folder for Git repos, fetches updates, and pulls only the ones that are behind.
+- `interactive_git_manager.py` — lets you browse repos, inspect status, and pull or open them individually.
 
-## Quick prerequisites
+## Requirements
 
-- Python 3.8 or newer
-- Git available on the PATH (run `git --version` to verify)
-- This project is written for Windows and uses File Explorer integration; it expects a base folder by default at `OneDrive\Desktop\Public`.
+- Python 3.8+
+- Git available on your `PATH`
+- Windows (for File Explorer integration and `explorer` calls)
 
 ## Usage
 
-Run the automated updater:
+Run the automated bulk updater:
 
 ```powershell
 python auto_git_pull.py
 ```
 
-Run the interactive manager:
+Run the interactive repository manager:
 
 ```powershell
 python interactive_git_manager.py
 ```
 
-## What each script does
+## How It Works
 
-- `auto_git_pull.py`
-- Scans the configured base folder recursively for Git repositories (skips hidden folders).
-- Runs `git fetch` for each repo, checks if the local branch is behind its upstream, and runs `git pull` only when needed.
-- Prints a concise summary of updated, up-to-date, skipped, and failed repositories. Default timeouts: fetch/pull operations use short timeouts (30s).
+### `auto_git_pull.py`
 
-- `interactive_git_manager.py`
-- Lets you navigate directories from the configured base folder, shows which folders are Git repos, current branch, and whether there are uncommitted changes.
-- For Git repos you can: pull from remote, open in File Explorer, or navigate into the folder.
+- Walks the configured base folder recursively
+- Finds Git repositories and skips hidden/system folders
+- Runs `git fetch` for each repo
+- Checks whether the current branch is behind its upstream
+- Runs `git pull` only when needed
+- Prints a summary of updated, up-to-date, skipped, and failed repositories
+
+### `interactive_git_manager.py`
+
+- Lists folders from the configured base location
+- Shows which directories are Git repos
+- Displays current branch and repository status
+- Lets you pull, open, or navigate to a repo from the terminal
 
 ## Configuration
 
-Both scripts default to a base folder constructed from the current user home: `Path.home() / 'OneDrive' / 'Desktop' / 'Public'`.
+Both scripts read the base folder from `config.json` in this folder. The file currently looks like this:
 
-To change the folder, open the top of the script and edit the `public_folder` / base path in `main()` (replace with any absolute path or environment-aware path you prefer). Example change:
-
-```python
-# Replace this in each script's main()
-public_folder = Path(r"D:\Some\Other\Folder")
+```json
+{
+  "base_path": "C:\\Users\\your_name\\OneDrive\\Desktop\\dev_backup"
+}
 ```
 
-## Notes & troubleshooting
+If you want to use a different directory, edit `config.json` and replace the value with your own local path. If the file is missing or the path does not exist, the scripts fall back to the default `OneDrive\Desktop\Public` location.
 
-- If you see `Public folder not found`, create the `Public` folder at your Desktop or edit the script's base path as described above.
-- If a fetch or pull times out, the script reports that repository as failed — try running `git -C <repo> fetch` or `git -C <repo> pull` manually to see more details.
-- The interactive manager uses `explorer` to open folders; this is Windows-specific.
+## Notes
 
-## Contributing & next steps
+- If the configured folder does not exist, the script will report that it could not find the base directory.
+- If a fetch or pull times out, the script marks that repo as failed and leaves the decision to you.
+- The interactive manager uses `explorer` to open directories, so it is designed for Windows.
 
-- Improvements to consider: add command-line options for base folder, recursion depth, or parallel fetch/pull; add logging to a file.
-- If you'd like, I can: add a `--path` CLI option, create a `requirements.txt` (if we introduce dependencies), or add a simple unit test harness.
+## Troubleshooting
 
-## Files of interest
+- Check that Git is installed and available in your shell: `git --version`
+- Run a repo manually if needed:
 
-- `auto_git_pull.py` — automated fetch-first bulk updater
-- `interactive_git_manager.py` — terminal interactive manager
+```powershell
+git -C "C:\path\to\repo" fetch
+git -C "C:\path\to\repo" pull
+```
 
-## License
+## Files
 
-Use and modify freely. If you want an explicit open-source license, let me know which one and I will add it.
+- `auto_git_pull.py` — automated repository sync
+- `interactive_git_manager.py` — interactive repo manager
